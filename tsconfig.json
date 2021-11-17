@@ -9,7 +9,8 @@
         "jsx": "react",
         "moduleResolution": "node",
         "allowSyntheticDefaultImports": true,
-        "lib": ["ES6"]
+        "skipLibCheck": true,
+        "lib": [ "ES6", "DOM" ]
     },
     "exclude": ["node_modules"]
 }
