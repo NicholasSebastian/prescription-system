@@ -1,0 +1,18 @@
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
+
+* {
+    font-family: 'Roboto', sans-serif;
+    box-sizing: border-box;
+}
+
+.container {
+    max-width: 700px !important;
+}
+
+.highlight tbody tr:hover {
+    cursor: pointer;
+}
+
+.pointer {
+    cursor: pointer;
+}

@@ -1,0 +1,171 @@
+<section class="container">
+    <div class="row">
+        <h4 class="col s12">Patient Dashboard</h4>
+        <h6 class="col s6">Welcome {{user.username}}</h6>
+        <button id="profile-button" class="btn waves-effect waves-light col s3">View Profile</button>
+        <button id="logout-button" class="btn waves-effect waves-light col s2 offset-s1">Logout</button>
+    </div>
+    <div class="card">
+        <div id="container" class="card-content"></div>
+    </div>
+</section>
+
+{{> _Profile}}
+
+<template id="table">
+    <div class="row">
+        <input id="search-input" class="col s9" placeholder="Search">
+        <button id="search-button" class="btn waves-effect waves-light col s2 offset-s1" type="button">
+            <i class="material-icons">search</i>
+        </button>
+    </div>
+
+    <h6 class="center-align">Current Prescriptions</h6>
+    <table id="current" class="highlight">
+        <thead>
+            <tr>
+                <th>Prescription Name</th> 
+                <th>Token</th>
+                <th>Doctor</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+    
+    <div style="height: 30px;"></div>
+
+    <h6 class="center-align">Past Prescriptions</h6>
+    <table id="past" class="highlight">
+        <thead>
+            <tr>
+                <th>Prescription Name</th> 
+                <th>Token</th>
+                <th>Doctor</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+</template>
+
+<template id="prescription">
+    <ul class="collection"></ul>
+    <button id="back-button-2" class="btn waves-effect waves-light">Back</button>
+</template>
+
+<script>
+    const container = document.querySelector("#container");
+
+    // #region LOGOUT
+
+    const logoutButton = document.querySelector("#logout-button");
+    logoutButton.addEventListener("click", e => {
+        e.preventDefault();
+        fetch("/logout", { method: "POST" })
+        .then(() => window.location.replace("/login"));
+    });
+
+    // #endregion
+
+    // #region VIEW PROFILE
+
+    const profile = document.querySelector("#update-user");
+    const profileButton = document.querySelector("#profile-button");
+
+    profileButton.addEventListener("click", e => {
+        e.preventDefault();
+        showTemplate(container, profile, form => {
+            const backButton = form.querySelector("#back-button");
+            backButton.addEventListener("click", e => {
+                e.preventDefault();
+                viewPrescriptionsTable();
+            });
+        });
+        const select = document.querySelectorAll('select');
+        M.FormSelect.init(select, {});
+    });
+
+    // #endregion
+
+    // #region LIST PRESCRIPTIONS
+
+    const table = document.querySelector("#table");
+
+    function viewPrescriptionsTable(url = "/prescriptions/patient") {
+        fetch(url, { method: "GET" })
+            .then(response => response.json())
+            .then(prescriptions => {
+                showTemplate(container, table, table => {
+                    const searchInput = table.querySelector("#search-input");
+                    const searchButton = table.querySelector("#search-button");
+                    searchButton.addEventListener("click", e => {
+                        e.preventDefault();
+                        viewPrescriptionsTable(`/prescriptions/patient?search=${searchInput.value}`);
+                    });
+
+                    const current = table.querySelector("#current");
+                    populateTable(current, prescriptions, (row, id) => {
+                        row.addEventListener("click", e => {
+                            e.preventDefault();
+                            viewPrescription(id);
+                        });
+                    }, item => item.status === "Pending");
+
+                    const past = table.querySelector("#past");
+                    populateTable(past, prescriptions, (row, id) => {
+                        row.addEventListener("click", e => {
+                            e.preventDefault();
+                            viewPrescription(id);
+                        });
+                    }, item => item.status === "Completed");
+                });
+            });
+    }
+
+    // #endregion
+
+    // #region VIEW PRESCRIPTION
+
+    const prescriptionTemplate = document.querySelector("#prescription");
+
+    function viewPrescription(id) {
+        fetch(`/prescription/${id}`, { method: "GET" })
+            .then(response => response.json())
+            .then(prescription => {
+                showTemplate(container, prescriptionTemplate, list => {
+                    const backButton = list.querySelector("#back-button-2");
+                    backButton.addEventListener("click", e => {
+                        e.preventDefault();
+                        viewPrescriptionsTable();
+                    });
+
+                    const listContainer = list.querySelector("ul.collection");
+                    const addEntry = (key, value) => {
+                        const li = document.createElement("li");
+                        li.classList.add("collection-item", "row");
+                        li.innerHTML = (`
+                            <div class="col s4">${key}</div>
+                            <div class="col s8">${value}</div>
+                        `);
+                        listContainer.appendChild(li);
+                    }
+
+                    addEntry("Token", prescription.prescriptionToken);
+                    addEntry("Name", prescription.prescriptionName);
+                    addEntry("Description", prescription.prescriptionDescription);
+                    addEntry("Date", prescription.prescriptionDate);
+                    addEntry("Status", prescription.prescriptionStatus);
+                    addEntry("Doctor", prescription.doctor);
+                    addEntry("Patient", prescription.patient);
+                    addEntry("Content", prescription.content ? (`
+                        <ul>${prescription.content?.map(item => `<li>${item.name}</li>`).join('')}</ul>
+                    `) : "Empty");
+                });
+            })
+    }
+
+    // #endregion
+
+    viewPrescriptionsTable();
+</script>

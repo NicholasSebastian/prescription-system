@@ -1,0 +1,47 @@
+<section class="container" style="max-width: 500px !important;">
+    <h4 class="center-align">TechBytes Platform</h4>
+    <div class="card">
+        <div class="card-content">
+            <span class="card-title">Login</span>
+            <form id="login-form">
+                <div class="input-field">
+                    <label for="username">Username</label>
+                    <input type="text" name="username">
+                </div>
+                <div class="input-field">
+                    <label for="password">Password</label>
+                    <input type="password" name="password">
+                </div>
+                <button type="submit" class="btn waves-effect waves-light">
+                    Log In
+                    <i class="material-icons right">send</i>
+                </button>
+            </form>
+        </div>
+    </div>
+</section>
+
+<script>
+    const loginForm = document.querySelector("#login-form");
+    loginForm.addEventListener("submit", e => {
+        e.preventDefault();
+        const { username, password } = e.target.elements;
+        const data = { 
+            username: username.value, 
+            password: password.value 
+        };
+
+        fetch("/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(data)
+        })
+        .then(response => {
+            if (response.ok) 
+                window.location.replace("/");
+            else 
+                M.toast({ html: "Invalid username or password" });
+        })
+        .catch(() => M.toast({ html: "A server error occured" }));
+    });
+</script>

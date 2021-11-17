@@ -1,0 +1,470 @@
+<section class="container">
+    <div class="row">
+        <h4 class="col s12">Doctor Dashboard</h4>
+        <h6 class="col s6">Welcome {{user.username}}</h6>
+        <button id="profile-button" class="btn waves-effect waves-light col s3">View Profile</button>
+        <button id="logout-button" class="btn waves-effect waves-light col s2 offset-s1">Logout</button>
+    </div>
+    <div id="container"></div>
+</section>
+
+<template id="tabs-content">
+    <div class="row">
+        <ul class="tabs">
+            <li class="tab col s6"><a href="#my-prescriptions">My Prescriptions</a></li>
+            <li class="tab col s6"><a href="#patients">Patient Prescriptions</a></li>
+        </ul>
+        <div id="my-prescriptions" class="card">
+            <div class="card-content"></div>
+        </div>
+        <div id="patients" class="card">
+            <div class="card-content"></div>
+        </div>
+    </div>
+</template>
+
+<template id="search-bar">
+    <div class="row">
+        <input id="search-input" class="col s9" placeholder="Search">
+        <button id="search-button" class="btn waves-effect waves-light col s2 offset-s1" type="button">
+            <i class="material-icons">search</i>
+        </button>
+    </div>
+    <div id="search-body"></div>
+</template>
+
+<template id="table">
+    <table class="highlight">
+        <thead>
+            <tr></tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+</template>
+
+<template id="patient-prescriptions">
+    <div style="margin-bottom: 20px;">
+        <button id="create-button" class="btn waves-effect waves-light">Create Prescription</button>
+        <button id="back-button-2" class="btn waves-effect waves-light">Back</button>
+    </div>
+    <ul class="collection"></ul>
+    <div id="prescription-body"></div>
+</template>
+
+<template id="update-prescription">
+    <form id="update-form">
+        <div>
+            <label for="_id">ID</label>
+            <input name="_id" disabled>
+        </div>
+        <div>
+            <label for="prescriptionName">Name</label>
+            <input name="prescriptionName">
+        </div>
+        <div>
+            <label for="prescriptionDescription">Description</label>
+            <input name="prescriptionDescription">
+        </div>
+        <div>
+            <label for="prescriptionDate">Date</label>
+            <input name="prescriptionDate">
+        </div>
+        <div>
+            <label for="prescriptionToken">Token</label>
+            <input name="prescriptionToken" disabled>
+        </div>
+        <div>
+            <label for="prescriptionStatus">Status</label>
+            <input name="prescriptionStatus" disabled>
+        </div>
+        <div class="row" style="margin-bottom: 0;">
+            <div class="col s4 offset-s5"><select id="medicine-select"></select></div>
+            <button type="button" id="medicine-add" class="btn waves-effect waves-light col s3" style="margin-top: 10px;">Add Medicine</button>
+        </div>
+        <ul id="prescription-content" class="collection"></ul>
+        <button type="submit" class="btn waves-effect waves-light">Submit</button>
+        <button type="button" id="back-button-3" class="btn waves-effect waves-light">Back</button>
+        <button type="button" id="delete-button" class="btn waves-effect waves-light red">Delete</button>
+    </form>
+</template>
+
+{{> _Profile}}
+
+{{> _Loading}}
+
+<script>
+    const container = document.querySelector("#container");
+    const searchBar = document.querySelector("#search-bar");
+    const table = document.querySelector("#table");
+    const loading = document.querySelector("#loading");
+
+    // #region LOGOUT
+
+    const logoutButton = document.querySelector("#logout-button");
+    logoutButton.addEventListener("click", e => {
+        e.preventDefault();
+        fetch("/logout", { method: "POST" })
+            .then(() => window.location.replace("/login"));
+    });
+
+    // #endregion
+
+    // #region VIEW PROFILE
+
+    const tabsContent = document.querySelector("#tabs-content");
+    const profile = document.querySelector("#update-user");
+    const profileButton = document.querySelector("#profile-button");
+
+    profileButton.addEventListener("click", e => {
+        e.preventDefault();
+        showTemplate(container, profile, form => {
+            const backButton = form.querySelector("#back-button");
+            backButton.addEventListener("click", e => {
+                e.preventDefault();
+                showTabs();
+                mountPrescriptionsView();
+                mountPatientsView();
+            });
+
+            return wrapInCard(form, "Your Profile");
+        });
+
+        const select = document.querySelectorAll('select');
+        M.FormSelect.init(select, {});
+    });
+
+    // #endregion
+
+    // #region LIST PRESCRIPTIONS
+
+    function loadPrescriptionsTable(url) {
+        const body = document.querySelector("#my-prescriptions #search-body");
+        const headers = ["Prescription Name", "Patient", "Status"];
+        loadTable(body, url, headers, (row, id) => {
+            row.addEventListener("click", e => {
+                e.preventDefault();
+                loadPrescriptionEditView(id);
+            });
+        });
+    }
+
+    function mountPrescriptionsView() {
+        const container = document.querySelector("#my-prescriptions > div.card-content");
+        const url = "/prescriptions/doctor";
+        mountView(container, loadPrescriptionsTable, url);
+    }
+
+    // #endregion
+
+    // #region LIST PATIENTS
+
+    function loadPatientsTable(url) {
+        const body = document.querySelector("#patients #search-body");
+        const headers = ["Patient Username", "Email", "Date of Birth"];
+        loadTable(body, url, headers, (row, id) => {
+            row.addEventListener("click", e => {
+                e.preventDefault();
+                loadPatientPrescriptionView(id)
+            });
+        });
+    }
+
+    function mountPatientsView() {
+        const container = document.querySelector("#patients > div.card-content");
+        const url = "/patients";
+        mountView(container, loadPatientsTable, url);
+    }
+
+    // #endregion
+
+    // #region LIST PATIENT PRESCRIPTIONS
+
+    const patientPrescriptions = document.querySelector("#patient-prescriptions");
+
+    async function loadPatientPrescriptionView(id) {
+        showTemplate(container, loading);
+
+        const response = await fetch(`/user/${id}`, { method: "GET" });
+        const patient = await response.json();
+
+        const response2 = await fetch(`/prescriptions/patient/${id}`, { method: "GET" });
+        const prescriptions = await response2.json();
+        
+        showTemplate(container, patientPrescriptions, content => {
+            const createButton = content.querySelector("#create-button");
+            createButton.addEventListener("click", e => {
+                e.preventDefault();
+                loadPrescriptionView(id);
+            });
+
+            const backButton = content.querySelector("#back-button-2");
+            backButton.addEventListener("click", e => {
+                e.preventDefault();
+                showTabs();
+                mountPrescriptionsView();
+                mountPatientsView();
+            });
+
+            const listContainer = content.querySelector("ul.collection");
+            const addEntry = (key, value) => {
+                const li = document.createElement("li");
+                li.classList.add("collection-item", "row");
+                li.innerHTML = (`
+                    <div class="col s4">${key}</div>
+                    <div class="col s8">${value}</div>
+                `);
+                listContainer.appendChild(li);
+            }
+            addEntry("Username", patient.username);
+            addEntry("Email", patient.email);
+            addEntry("Name", patient.name);
+            addEntry("NRIC", patient.nric);
+            addEntry("Contact", patient.contact);
+            addEntry("Date of Birth", patient.dateOfBirth);
+
+            const prescriptionBody = content.querySelector("#prescription-body");
+            showTemplate(prescriptionBody, table, content => {
+                const head = content.querySelector("thead > tr");
+                ["Prescription Name", "Token", "Status"].forEach(header => {
+                    const th = document.createElement("th");
+                    th.innerHTML = header;
+                    head.appendChild(th);
+                });
+                populateTable(content, prescriptions, (row, id) => {
+                    row.addEventListener("click", e => {
+                        e.preventDefault();
+                        loadPrescriptionEditView(id);
+                    });
+                });
+            });
+
+            return wrapInCard(content);
+        });
+    }
+
+    // #endregion
+
+    // #region VIEW PRESCRIPTION
+
+    const prescriptionForm = document.querySelector("#update-prescription");
+
+    async function loadPrescriptionView(id, callback) {
+        showTemplate(container, loading);
+
+        const response2 = await fetch("/medicines", { method: "GET" });
+        const medicines = await response2.json();
+
+        showTemplate(container, prescriptionForm, form => {
+            if (callback) callback(form);
+
+            const collection = form.querySelector("#prescription-content");
+
+            const medicineSelect = form.querySelector("#medicine-select");
+            medicines.forEach(medicine => {
+                const option = document.createElement("option");
+                option.innerHTML = medicine.medicineName;
+                option.setAttribute("value", medicine._id);
+                medicineSelect.appendChild(option);
+            });
+
+            const addMedicineButton = form.querySelector("#medicine-add");
+            addMedicineButton.addEventListener("click", e => {
+                e.preventDefault();
+                const id = medicineSelect.value;
+                const value = medicineSelect.options[medicineSelect.selectedIndex].text;
+                const item = createCollectionItem(id, value);
+                collection.appendChild(item);
+            });
+
+            const updateForm = form.querySelector("#update-form");
+            updateForm.addEventListener("submit", e => {
+                e.preventDefault();
+                const fields = ["_id", "prescriptionName", "prescriptionDescription", "prescriptionDate", "prescriptionToken", "prescriptionStatus"]
+                const data = getFormData(e, fields);
+                
+                const medicineItems = collection.getElementsByTagName("li");
+                const medicines = Array.from(medicineItems).map(item => item.attributes["data-id"].value);
+                data.prescriptionContent = medicines;
+                
+                if (callback)
+                    updatePrescription(data);
+                else {
+                    createPresciption({ ...data, patientId: id });
+                }
+            });
+
+            const backButton = form.querySelector("#back-button-3");
+            backButton.addEventListener("click", e => {
+                e.preventDefault();
+                showTabs();
+                mountPrescriptionsView();
+                mountPatientsView();
+            });
+
+            const deleteButton = form.querySelector("#delete-button");
+            deleteButton.addEventListener("click", e => {
+                e.preventDefault();
+                deletePrescription(id);
+                showTabs();
+                mountPrescriptionsView();
+                mountPatientsView();
+            });
+
+            return wrapInCard(form, callback ? "Edit Prescription" : "Create Prescription");
+        });
+            
+        const select = document.querySelectorAll('select');
+        M.FormSelect.init(select, {});
+    }
+
+    async function loadPrescriptionEditView(id) {
+        const response = await fetch(`/prescription/${id}`);
+        const prescription = await response.json();
+        loadPrescriptionView(id, form => {
+            Object.keys(prescription).forEach(key => {
+                const value = prescription[key];
+                const element = form.querySelector(`*[name='${key}']`);
+                if (element) element.value = value;
+            });
+
+            const collection = form.querySelector("#prescription-content");
+            prescription.content.forEach(medicine => {
+                const item = createCollectionItem(medicine._id, medicine.name);
+                collection.appendChild(item);
+            });
+        });
+    }
+
+    // #endregion
+
+    // #region UPDATE PRESCRIPTION
+
+    function updatePrescription(data) {
+        fetch(`/prescription/${data["_id"]}`, { 
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(data)
+        })
+        .then(response => {
+            if (response.ok) {
+                M.toast({ html: `'${data.prescriptionName}' successfully updated` });
+                showTabs();
+                mountPrescriptionsView();
+                mountPatientsView();
+            }
+            else M.toast({ html: "Invalid input" });
+        })
+        .catch();
+    }
+
+    // #endregion
+
+    // #region CREATE PRESCRIPTION
+
+    function createPresciption(data) {
+        fetch("/prescription", { 
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(data)
+        })
+        .then(response => {
+            if (response.ok) {
+                M.toast({ html: `'${data.prescriptionName}' successfully created` });
+                showTabs();
+                mountPrescriptionsView();
+                mountPatientsView();
+            }
+            else M.toast({ html: "Invalid input" });
+        })
+        .catch();
+    }
+
+    // #endregion
+
+    // #region DELETE PRESCRIPTION
+
+    function deletePrescription(id) {
+        fetch(`/prescription/${id}`, { 
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(data)
+        })
+        .then(response => {
+            if (response.ok) {
+                M.toast({ html: `'${data.prescriptionName}' successfully deleted` });
+                showTabs();
+                mountPrescriptionsView();
+                mountPatientsView();
+            }
+            else M.toast({ html: "Something went wrong" });
+        })
+        .catch();
+    }
+
+    // #endregion
+
+    // #region HELPERS
+
+    function loadTable(body, url, headers, callback) {
+        showTemplate(body, loading);
+        fetch(url, { method: "GET" })
+            .then(response => response.json())
+            .then(prescriptions => {
+                showTemplate(body, table, content => {
+                    const head = content.querySelector("thead > tr");
+                    headers.forEach(header => {
+                        const th = document.createElement("th");
+                        th.innerHTML = header;
+                        head.appendChild(th);
+                    });
+
+                    populateTable(content, prescriptions, callback);
+                });
+            });
+    }
+
+    function mountView(container, loader, url) {
+        showTemplate(container, searchBar, content => {
+            const searchInput = content.querySelector("#search-input");
+            const searchButton = content.querySelector("#search-button");
+            searchButton.addEventListener("click", e => {
+                e.preventDefault();
+                loader(`${url}?search=${searchInput.value}`);
+            });
+        });
+        loader(url);
+    }
+
+    function showTabs() {
+        showTemplate(container, tabsContent);
+        const tabs = document.querySelector(".tabs");
+        M.Tabs.init(tabs, {});
+    }
+
+    function createCollectionItem(id, text) {
+        const item = document.createElement("li");
+        item.classList.add("collection-item");
+        item.setAttribute("data-id", id);
+        item.innerHTML = (`
+            <div>
+                ${text}
+                <i class="secondary-content material-icons red-text lighten-1">delete</i>
+            </div>
+        `);
+
+        const deleteIcon = item.querySelector("i.secondary-content");
+        deleteIcon.classList.add("pointer");
+        deleteIcon.addEventListener("click", e => {
+            e.preventDefault();
+            item.remove();
+        });
+
+        return item;
+    };
+
+    // #endregion
+
+    showTabs();
+    mountPrescriptionsView();
+    mountPatientsView();
+</script>

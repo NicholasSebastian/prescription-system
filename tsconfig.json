@@ -1,0 +1,15 @@
+{
+    "compilerOptions": {
+        "target": "ES6",
+        "module": "CommonJS",
+        "rootDir": "./",
+        "outDir": "./build",
+        "esModuleInterop": true,
+        "strict": true,
+        "jsx": "react",
+        "moduleResolution": "node",
+        "allowSyntheticDefaultImports": true,
+        "lib": ["ES6"]
+    },
+    "exclude": ["node_modules"]
+}

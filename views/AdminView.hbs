@@ -1,0 +1,240 @@
+<section class="container">
+    <div class="row">
+        <h4 class="col s12">Admin Dashboard</h4>
+        <h6 class="col s9">Welcome {{user.username}}</h6>
+        <button id="logout-button" class="btn waves-effect waves-light col s3">Logout</button>
+    </div>
+    <div class="row">
+        <ul class="tabs">
+            <li class="tab col s6"><a href="#list-users">View Existing Users</a></li>
+            <li class="tab col s6"><a href="#register">Register a New User</a></li>
+        </ul>
+        <div id="list-users" class="card">
+            <div id="list-users-container" class="card-content"></div>
+        </div>
+        <div id="register" class="card">
+            <div class="card-content">
+                <form id="register-form">
+                    <div class="input-field">
+                        <label for="email">Email</label>
+                        <input type="email" name="email">
+                    </div>
+                    <div class="input-field">
+                        <label for="username">Username</label>
+                        <input type="text" name="username">
+                    </div>
+                    <div class="input-field">
+                        <label for="password">Password</label>
+                        <input type="password" name="password">
+                    </div>
+                    <button type="submit" class="btn waves-effect waves-light">Register</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</section>
+
+<template id="list-users-content">
+    <div class="row">
+        <input id="search-input" class="col s9" placeholder="Search">
+        <button id="search-button" class="btn waves-effect waves-light col s2 offset-s1" type="button">
+            <i class="material-icons">search</i>
+        </button>
+    </div>
+    <div id="list-users-body"></div>
+</template>
+
+<template id="table">
+    <table class="highlight">
+        <thead>
+            <tr>
+                <th>Username</th> 
+                <th>Email</th>
+                <th>Role</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+</template>
+
+<template id="update-user">
+    <form id="update-form">
+        <div>
+            <label for="_id">ID</label>
+            <input name="_id" disabled>
+        </div>
+        <div>
+            <label for="username">Username</label>
+            <input name="username">
+        </div>
+        <div>
+            <label for="password">Password</label>
+            <input type="password" name="password">
+        </div>
+        <div>
+            <label for="name">Name</label>
+            <input name="name">
+        </div>
+        <div>
+            <label for="nric">NRIC</label>
+            <input name="nric">
+        </div>
+        <div>
+            <label for="email">Email</label>
+            <input type="email" name="email">
+        </div>
+        <div>
+            <label for="contact">Contact</label>
+            <input name="contact">
+        </div>
+        <div>
+            <label for="dateOfBirth">Date of Birth</label>
+            <input name="dateOfBirth">
+        </div>
+        <div>
+            <label for="role">Role</label>
+            <select name="role">
+                <option value="Admin">Admin</option>
+                <option value="Doctor">Doctor</option>
+                <option value="Pharmacist">Pharmacist</option>
+                <option value="Patient">Patient</option>
+            </select>
+        </div>
+        <button type="submit" class="btn waves-effect waves-light">Update</button>
+        <button type="button" id="back-button" class="btn waves-effect waves-light">Back</button>
+    </form>
+</template>
+
+{{> _Loading}}
+
+<script>
+    const tabs = document.querySelector(".tabs");
+    M.Tabs.init(tabs, {});
+
+    // #region LOGOUT
+
+    const logoutButton = document.querySelector("#logout-button");
+    logoutButton.addEventListener("click", e => {
+        e.preventDefault();
+        fetch("/logout", { method: "POST" })
+        .then(() => window.location.replace("/login"));
+    });
+
+    // #endregion
+
+    // #region REGISTER
+
+    const registerForm = document.querySelector("#register-form");
+    registerForm.addEventListener("submit", e => {
+        e.preventDefault();
+        const fields = ["email", "username", "password"]
+        const data = getFormData(e, fields);
+
+        fetch("/register", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(data)
+        })
+        .then(() => {
+            M.toast({ html: `User '${data.username}' registered successfully` });
+            loadUsersTable();
+        })
+        .catch(() => M.toast({ html: "A server error occured" }));
+    });
+
+    // #endregion
+
+    // #region LIST USERS
+
+    const usersListContainer = document.querySelector("#list-users-container");
+    const usersListTemplate = document.querySelector("#list-users-content");
+    const updateUserTemplate = document.querySelector("#update-user");
+    const table = document.querySelector("#table");
+    const loading = document.querySelector("#loading");
+
+    function loadUsersTable(url = "/users") {
+        const usersListBody = document.querySelector("#list-users-body");
+        showTemplate(usersListBody, loading);
+        fetch(url, { method: "GET" })
+            .then(response => response.json())
+            .then(users => {
+                showTemplate(usersListBody, table, table => {
+                    populateTable(table, users, (row, id) => {
+                        row.addEventListener("click", e => {
+                            e.preventDefault();
+                            viewUpdateUser(id);
+                        });
+                    });
+                });
+            })
+            .catch(error => console.log(error));
+    }
+    
+    function viewUsersTable() {
+        showTemplate(usersListContainer, usersListTemplate, content => {
+            const searchInput = content.querySelector("#search-input");
+            const searchButton = content.querySelector("#search-button");
+            searchButton.addEventListener("click", e => {
+                e.preventDefault();
+                loadUsersTable(`/users?search=${searchInput.value}`);
+            });
+        });
+        loadUsersTable();
+    }
+
+    // #endregion
+
+    // #region VIEW / UPDATE USER
+
+    function viewUpdateUser(id) {
+        fetch(`/user/${id}`, { method: "GET" })
+            .then(response => response.json())
+            .then(user => {
+                showTemplate(usersListContainer, updateUserTemplate, form => {
+                    Object.keys(user).forEach(key => {
+                        if (key === "password") return;
+                        const value = user[key];
+                        const element = form.querySelector(`*[name='${key}']`);
+                        if (element) element.value = value;
+                    });
+
+                    const updateForm = form.querySelector("#update-form");
+                    updateForm.addEventListener("submit", e => {
+                        e.preventDefault();
+                        const fields = ["_id", "username", "password", "name", "nric", "email", "contact", "dateOfBirth", "role"]
+                        const data = getFormData(e, fields);
+                        updateUser(data);
+                    });
+
+                    const backButton = form.querySelector("#back-button");
+                    backButton.addEventListener("click", e => {
+                        e.preventDefault();
+                        viewUsersTable();
+                    });
+                });
+                
+                const select = document.querySelectorAll('select');
+                M.FormSelect.init(select, {});
+            });
+    }
+
+    function updateUser(data) {
+        fetch(`/user/${data["_id"]}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(data)
+        })
+        .then(response => {
+            if (response.ok) {
+                M.toast({ html: `User '${data.username}' successfully updated` });
+                viewUsersTable();
+            }
+            else M.toast({ html: "Invalid input" });
+        })
+        .catch(() => M.toast({ html: "A server error occured" }));
+    }
+
+    // #endregion
+
+    viewUsersTable();
+</script>

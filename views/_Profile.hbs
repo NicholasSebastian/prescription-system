@@ -1,0 +1,77 @@
+<template id="update-user">
+    <form id="update-user-form">
+        <div>
+            <label for="_id">ID</label>
+            <input name="_id" disabled hidden>
+        </div>
+        <div>
+            <label for="username">Username</label>
+            <input name="username">
+        </div>
+        <div>
+            <label for="password">Password</label>
+            <input type="password" name="password">
+        </div>
+        <div>
+            <label for="name">Name</label>
+            <input name="name">
+        </div>
+        <div>
+            <label for="nric">NRIC</label>
+            <input name="nric">
+        </div>
+        <div>
+            <label for="email">Email</label>
+            <input type="email" name="email">
+        </div>
+        <div>
+            <label for="contact">Contact</label>
+            <input name="contact">
+        </div>
+        <div>
+            <label for="dateOfBirth">Date of Birth</label>
+            <input name="dateOfBirth">
+        </div>
+        <div>
+            <label for="role">Role</label>
+            <select name="role">
+                <option value="Admin">Admin</option>
+                <option value="Doctor">Doctor</option>
+                <option value="Pharmacist">Pharmacist</option>
+                <option value="Patient">Patient</option>
+            </select>
+        </div>
+        <button type="submit" class="btn waves-effect waves-light">Update</button>
+        <button type="button" id="back-button" class="btn waves-effect waves-light">Back</button>
+    </form>
+
+    <script>
+        // DISPLAY PROFILE
+        fetch("/user", { method: "GET" })
+            .then(response => response.json())
+            .then(user => {
+                const form = document.querySelector("#update-user-form");
+                Object.keys(user).forEach(key => {
+                    if (key === "password") return;
+                    const value = user[key];
+                    const element = form.querySelector(`*[name='${key}']`);
+                    if (element) element.value = value;
+                });
+            });
+
+        // UPDATE PROFILE
+        document.querySelector("#update-user-form").addEventListener("submit", e => {
+            e.preventDefault();
+            const fields = ["_id", "username", "password", "name", "nric", "email", "contact", "dateOfBirth", "role"];
+            const data = getFormData(e, fields);
+
+            fetch("/user", {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(data)
+            })
+            .then(() => M.toast({ html: `User '${data.username}' successfully updated` }))
+            .catch(() => M.toast({ html: "A server error occured" }));
+        });
+    </script>
+</template>

@@ -1,0 +1,265 @@
+<section class="container">
+    <div class="row">
+        <h4 class="col s12">Pharmacist Dashboard</h4>
+        <h6 class="col s6">Welcome {{user.username}}</h6>
+        <button id="profile-button" class="btn waves-effect waves-light col s3">View Profile</button>
+        <button id="logout-button" class="btn waves-effect waves-light col s2 offset-s1">Logout</button>
+    </div>
+    <div id="container"></div>
+</section>
+
+<template id="tabs-content">
+    <div class="row">
+        <ul class="tabs">
+            <li class="tab col s6"><a href="#scan-token">Scan Token</a></li>
+            <li class="tab col s6"><a href="#list-medicines">View Medicines</a></li>
+        </ul>
+        <div id="scan-token" class="card">
+            <div class="card-content">
+                <input type="text" id="token-input" placeholder="Prescription Token">
+                <button id="token-submit" class="btn waves-effect waves-light">Scan Token</button>
+                <div id="prescription-container"></div>
+            </div>
+        </div>
+        <div id="list-medicines" class="card">
+            <div class="card-content">
+                <div class="row">
+                    <input id="search-input" class="col s9" placeholder="Search">
+                    <button id="search-button" class="btn waves-effect waves-light col s2 offset-s1" type="button">
+                        <i class="material-icons">search</i>
+                    </button>
+                </div>
+                <ul id="medicine-list" class="collection"></ul>
+                <div class="row">
+                    <input id="add-medicine-input" class="col s8" placeholder="New Medicine">
+                    <button id="add-medicine-button" class="btn waves-effect waves-light col s3 offset-s1" type="button" style="margin-top: 8px;">Add Medicine</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</template>
+
+<template id="prescription-view">
+    <ul class="collection" style="margin-top: 30px;"></ul>
+    <button id="prescription-button" class="btn waves-effect waves-light">Mark as Complete</button>
+</template>
+
+{{> _Profile}}
+
+{{> _Loading}}
+
+<script>
+    const container = document.querySelector("#container");
+    const loading = document.querySelector("#loading");
+
+    // #region LOGOUT
+    
+    const logoutButton = document.querySelector("#logout-button");
+    logoutButton.addEventListener("click", e => {
+        e.preventDefault();
+        fetch("/logout", { method: "POST" })
+        .then(() => window.location.replace("/login"));
+    });
+
+    // #endregion
+
+    // #region VIEW PROFILE
+
+    const profile = document.querySelector("#update-user");
+    const profileButton = document.querySelector("#profile-button");
+    profileButton.addEventListener("click", e => {
+        e.preventDefault();
+        showTemplate(container, profile, form => {
+            const backButton = form.querySelector("#back-button");
+            backButton.addEventListener("click", e => {
+                e.preventDefault();
+                mountTabs();
+            });
+
+            return wrapInCard(form, "Your Profile");
+        });
+    });
+
+    // #endregion
+
+    // #region VIEW PRESCRIPTION
+
+    async function viewPrescription() {
+        const tokenInput = document.querySelector("#token-input");
+        const prescriptionContainer = document.querySelector("#prescription-container");
+        const prescriptionView = document.querySelector("#prescription-view");
+        showTemplate(prescriptionContainer, loading);
+        try {
+            const token = tokenInput.value;
+            const response = await fetch(`/prescription/token/${token}`, { method: "GET" });
+            if (response.ok) {
+                const data = await response.json();
+
+                showTemplate(prescriptionContainer, prescriptionView, content => {
+                    const collectionContainer = content.querySelector("ul.collection");
+                    populateList(collectionContainer, addEntry => {
+                        addEntry("Prescription Name", data.name);
+                        addEntry("Description", data.description);
+                        addEntry("Date", data.date);
+                        addEntry("Token", data.token);
+                        addEntry("Status", data.status);
+                        addEntry("Doctor", data.doctor);
+                        addEntry("Patient", data.patient);
+                        addEntry("Content", data.content);
+                    });
+
+                    const prescriptionButton = content.querySelector("#prescription-button");
+                    if (data.status === "Completed") {
+                        prescriptionButton.disabled = true;
+                    }
+                    else {
+                        prescriptionButton.addEventListener("click", e => {
+                            e.preventDefault();
+                            markPrescriptionComplete(data.id);
+                        });
+                    }
+                });
+            }
+            else {
+                M.toast({ html: "Invalid Input" });
+                prescriptionContainer.innerHTML = "";
+            }
+        }
+        catch (error) {}
+    }
+
+    // #endregion
+
+    // #region LIST MEDICINES
+
+    async function loadMedicinesView() {
+        loadMedicinesList();
+
+        const searchInput = document.querySelector("#search-input");
+        const searchButton = document.querySelector("#search-button");
+        searchButton.addEventListener("click", e => {
+            e.preventDefault();
+            loadMedicinesList(searchInput.value);
+        });
+
+        const addMedicineInput = document.querySelector("#add-medicine-input");
+        const addMedicineButton = document.querySelector("#add-medicine-button");
+        addMedicineButton.addEventListener("click", e => {
+            e.preventDefault();
+            createMedicine(addMedicineInput.value);
+        });
+    }
+
+    async function loadMedicinesList(search) {
+        const url = search ? `/medicines?search=${search}` : "/medicines";
+        const response = await fetch(url, { method: "GET" });
+        const medicines = await response.json();
+
+        const medicineList = document.querySelector("#medicine-list");
+        medicineList.innerHTML = "";
+        medicines.forEach(item => {
+            const li = document.createElement("li");
+            li.classList.add("collection-item", "row");
+            li.innerHTML = (`
+                <div>
+                    ${item.medicineName}
+                    <i class="secondary-content material-icons red-text lighten-1">delete</i>
+                </div>
+            `);
+
+            const deleteIcon = li.querySelector("i.secondary-content");
+            deleteIcon.classList.add("pointer");
+            deleteIcon.addEventListener("click", e => {
+                e.preventDefault();
+                deleteMedicine(item._id);
+            });
+            medicineList.appendChild(li);
+        });
+    }
+
+    // #endregion
+
+    // #region ADD MEDICINE
+
+    function createMedicine(name) {
+        fetch("/medicine", { 
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ medicineName: name })
+        })
+        .then(response => {
+            if (response.ok) {
+                M.toast({ html: `'${name}' successfully created` });
+                loadMedicinesList();
+            }
+            else M.toast({ html: "Invalid input" });
+        })
+        .catch();
+    }
+
+    // #endregion
+
+    // #region DELETE MEDICINE
+
+    function deleteMedicine(id) {
+        fetch(`/medicine/${id}`, { method: "DELETE" })
+            .then(() => {
+                M.toast({ html: "Medicine deleted" })
+                loadMedicinesList();
+            });
+    }
+
+    // #endregion
+
+    // #region UPDATE PRESCRIPTION STATUS
+
+    function markPrescriptionComplete(id) {
+        fetch(`/prescription/status/${id}`, { method: "PUT" })
+            .then(() => {
+                M.toast({ html: "Prescription marked as Complete" })
+                viewPrescription();
+            });
+    }
+
+    // #endregion
+
+    // #region LAYOUT
+
+    function mountTabs() {
+        const tabs = document.querySelector("#tabs-content");
+        showTemplate(container, tabs);
+        loadScanTokenView();
+        loadMedicinesView();
+
+        const allTabs = document.querySelector(".tabs");
+        M.Tabs.init(allTabs, {});
+    }
+
+    function loadScanTokenView() {
+        const tokenSubmit = document.querySelector("#token-submit");
+        tokenSubmit.addEventListener("click", async e => {
+            e.preventDefault();
+            viewPrescription();
+        });
+    }
+
+    function populateList(container, callback) {
+        const addEntry = (key, value) => {
+            const li = document.createElement("li");
+            li.classList.add("collection-item", "row");
+            if (Array.isArray(value)) {
+                value = `<ul>${value.map(item => `<li>${item}</li>`).join('')}</ul>`;
+            }
+            li.innerHTML = (`
+                <div class="col s4"><b>${key}</b></div>
+                <div class="col s8">${value}</div>
+            `);
+            container.appendChild(li);
+        }
+        callback(addEntry);
+    }
+
+    // #endregion
+
+    mountTabs();
+</script>
